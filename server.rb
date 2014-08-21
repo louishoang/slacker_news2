@@ -21,13 +21,13 @@ end
 
 def post_is_valid?(post_title, post_url, post_description)
 
-  if title_is_valid? post_title
+  if !title_is_valid? post_title
     return false
 
-  elsif url_is_valid? post_url
+  elsif !url_is_valid? post_url
     return false
 
-  elsif description_is_valid? post_description
+  elsif !description_is_valid? post_description
     return false
   elsif already_submitted post_url
     return false
@@ -85,7 +85,7 @@ post '/submit' do
       @error = 'Invalid url (FORMAT: www.google.com'
     elsif !description_is_valid? @post_description
       @error = 'Description must be at least 20 characters'
-    else
+    elsif already_submitted @post_url
       @error = 'This URL has already been posted'
     end
     erb :submit
