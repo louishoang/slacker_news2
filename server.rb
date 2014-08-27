@@ -70,6 +70,9 @@ def description_is_valid? post_description
   true
 end
 
+def comment_is_empty?(post_comment)
+  post_comment == '' || post_comment.nil?
+end
 
 
 get '/' do
@@ -115,41 +118,67 @@ post '/submit' do
   end
 end
 
-get '/articles/:article_id/comments' do
+def get_comments_for_article(article_id)
+  query = 'SELECT articles.id, comments.username, comments.comment, comments.id AS comment_id
+            FROM comments JOIN articles
+            ON articles.id = comments.article_id
+            WHERE articles.id = $1'
+
+  db_connection do |conn|
+    conn.exec_params(query, [article_id])
+  end
+end
+
+def find_article(article_id)
   query = 'SELECT articles.id, articles.title, articles.url, articles.descriptions,
             comments.id AS comment_id, comments.comment
             FROM articles LEFT OUTER JOIN comments
             ON articles.id = comments.article_id
             WHERE articles.id = $1'
 
-  query_comments = 'SELECT articles.id, comments.username, comments.comment, comments.id AS comment_id
-            FROM comments JOIN articles
-            ON articles.id = comments.article_id
-            WHERE articles.id = $1'
-  #binding.pry
   db_connection do |conn|
-    @articles = conn.exec_params(query, [params[:article_id]])
-    @comments = conn.exec_params(query, [params[:article_id]])
+    conn.exec_params(query, [article_id]).first
   end
-  #binding.pry
+end
+
+get '/articles/:article_id/comments' do
+  @article = find_article(params[:article_id])
+  @comments = get_comments_for_article(params[:article_id])
+  @comment = {}
+
   erb :comments
 end
 
 
 post '/articles/:article_id/comments' do
-  @user = params[:username]
-  @comment = params[:comment]
-  @id = params[:article_id]
+  @comment = { username: params[:username], comment: params[:comment] }
 
-  #binding.pry
-  insert_comment = 'INSERT INTO comments(
-                    username, comment, article_id)
-                    VALUES ($1, $2, $3)'
+  if comment_is_empty?(@comment[:comment])
+    @article = find_article(params[:article_id])
+    @comments = get_comments_for_article(params[:article_id])
+
+    @error = 'Enter Your Comment'
+
+    erb :comments
+  else
+
+    @user = params[:username]
+    @comment = params[:comment]
+    @id = params[:article_id]
+
+    insert_comment = 'INSERT INTO comments(
+                      username, comment, article_id)
+                      VALUES ($1, $2, $3)'
 
 
-  db_connection do |conn|
+    db_connection do |conn|
+      #binding.pry
       conn.exec_params(insert_comment, [@user, @comment, @id])
     end
-    #binding.pry
-  erb :comments
+
+    redirect "/articles/#{params[:article_id]}/comments"
+  end
 end
+
+# def insert_comment(user,comment,article_id)
+
